@@ -1,0 +1,458 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>冯婷婷</title>
+    <description></description>
+    <link>/</link>
+    <atom:link href="/feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Thu, 20 Oct 2016 13:50:06 +0800</pubDate>
+    <lastBuildDate>Thu, 20 Oct 2016 13:50:06 +0800</lastBuildDate>
+    <generator>Jekyll v3.1.1</generator>
+    
+      <item>
+        <title>IPV6 调研</title>
+        <description>&lt;p&gt;从2016年6月1日开始，所有上传到app store的app必须支持 IPv6网络，大多数使用了NSURLSession和CFNetwork APIs的app可以不做任何变化。
+如果你的app使用了IPv4 APIS硬编码（硬编码是指将可变变量用一个固定值来代替的方法） ip地址，你需要做出的改动是：
+支持 IPv6 DNS64/NAT64 Networks
+使用了IPv4的企业等需要配置IPv6 DNS64 / NAT64，根据每个app的不同，从ipv4转换到ipv6有一些不同：
+1 如果使用了高级别的网络API，比如NSURLSession and the CFNetwork等框架并且用名字连接，不需要做任何转换，如果你没有用名字连接，那你就需要避免网络连接错误的几种情况
+1&amp;gt; 避免TCP因超时而出现断开，使TCP存活是通过设置SO_KEEPALIVE标志用setsockopt插槽 —在电脑上可用，在软件上不可以用，因为要影响其他的app
+正确地创建插槽。正确的调用创建TCP套接字是：
+插座（PF_INET，SOCK_STREAM，IPPROTO_TCP）; //的IPv4
+插座（PF_INET6，SOCK_STREAM，IPPROTO_TCP）; // IPv6的&lt;/p&gt;
+
+&lt;p&gt;2 如果使用了低级的API或者框架，就要确保在ipv6和4状态下都可以正常运行
+利用DNS64/NAT64提供二者通道&lt;/p&gt;
+
+&lt;p&gt;在这种类型的工作流程中，客户端发送DNS查询到DNS64服务器，其从DNS服务器请求IPv6地址。当IPv6地址被发现，它的立即传递回客户端。然而，未找到地址时，所述DNS64服务器请求IPv4地址代替。所述DNS64服务器随后合成由前缀IPv4地址的IPv6地址，并传递回客户端。在这点上，客户端总是接收的IPv6就绪地址。
+当客户端发送到服务器的请求时，发往合成地址的任何IPv6数据包自动由网络通过一个NAT64网关路由。网关进行IPv6到IPv4地址和协议转换的请求。它也执行IPv4到IPv6转换来自服务器的响应。
+//////重点
+应用程序不支持IPv6兼容的DNS64/ NAT64网络操作时的原因 及解决办法：
+1 IP地址文字嵌入协议。许多通信协议SIP、FTP的WebSockets，和对等网络协议（P2PP），包括在协议消息的IP地址文字。例如，FTP参数命令数据输入端口和包括IP地址文字被动交换信息。同样，IP地址的文字可能会出现在SIP头字段的值，如收件人，发件人，联系方式，记录路由，和Via。
+2 嵌入在配置文件中的IP地址文字。配置文件通常包含IP地址的文字。
+3 网络预检。许多应用程序试图主动检查Internet连接，或者通过IP地址常量来网络可达性的API活跃的Wi-Fi连接。
+4 使用低级别的网络API。有些应用与插座等原始的网络API，如的gethostbyname，gethostbyname2和INET_ATON直接工作。这些API很容易误用或他们只支持IPv4，例如，主机名解析为AF_INET地址族，而不是AF_UNSPEC地址族。
+5 用小地址族的储存容器。有些应用程序和网络库使用的地址存储容器，如uint32_t的，in_addr结构和SOCKADDR_IN - 这是32位或更小。
+/////保证支持IPv6
+方法一：使用高级别的网络框架或者低级别的POSIX socket APIs
+例如：WebKit，Cocoa URL loading system，CFNetwork
+方法二： 不要使用IP地址字面—IP Address Literals
+确保你不及格的IPv4地址文字的点符号的API，例如getaddrinfo（getaddrinfo函数能够处理名字到地址以及服务到端口这两种转换，返回的是一个sockaddr结构的链表而不是一个地址清单。这些 sockaddr结构随后可由套接口函数直接使用。如此一来，getaddrinfo函数把协议相关性安全隐藏在这个库函数内部。应用程序只要处理由 getaddrinfo函数填写的套接口地址结构。该函数在 POSIX规范中定义了。）和SCNetworkReachabilityCreateWithName。相反，使用高层次的网络架构和API的地址无关的版本，如getaddrinfo和getnameinfo，并通过他们的主机名或完全限定域名（FQDN）。
+——在iOS中9和OS X10.11及更高版本，NSURLSession和CFNetwork的自动合成的IPv6与IPv4文字当地上DNS64/ NAT64网络运营设备地址。 
+方法三：连接而无需预检
+可达性的API，正在确定连接问题后，用于诊断目的。
+1 如果许多应用必须检查网络的可用性，避免调用SCNetworkReachabilityCreateWithAddress方法。调用SCNetworkReachabilityCreateWithName方法，并传递给它一个主机名代替。
+2有些应用程序还通过SCNetworkReachabilityCreateWithAddress方法169.254.0.0，自分配的链路本地地址的IPv4地址，以检查活跃的Wi-Fi连接。要检查Wi-Fi或蜂窝连接，查找网络可达性标志kSCNetworkReachabilityFlagsIsWWAN代替。
+可达性
+============
+可达示例应用程序演示了如何使用系统配置框架来监测iOS设备的网络状态。特别是，它说明了如何知道何时IP可路由并且当流量将通过无线广域网（WWAN）接口诸如EDGE或3G路由。&lt;/p&gt;
+
+&lt;p&gt;注：可达性不能告诉你的应用程序，如果你可以连接到特定的主机，只有一个接口是可用的可能允许一个连接，并且该接口是否是WWAN。要了解何时以及如何使用可达性，读作[网络概述] [1]。&lt;/p&gt;
+
+&lt;p&gt;[1]： &lt;a href=&quot;http://developer.apple.com/library/ios/#documentation/NetworkingInternetWeb/Conceptual/NetworkingOverview/&quot;&gt;http://developer.apple.com/library/ios/#documentation/NetworkingInternetWeb/Conceptual/NetworkingOverview/&lt;/a&gt;&lt;/p&gt;
+
+&lt;h1 id=&quot;ipv6&quot;&gt;IPv6支持&lt;/h1&gt;
+&lt;p&gt;完全可达性支持IPv6。更具体地，每个的API处理IPv6以下列方式：&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;reachabilityWithHostName和SCNetworkReachabilityCreateWithName：在内部，这个API的工 作是将主机名称解析为一组IP地址（可以是IPv4和IPv6地址的任意组合）和所有可用的地址建立单独的显示器。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;reachabilityWithAddress和SCNetworkReachabilityCreateWithAddress：要监视IPv6地 址，只需通过在IPv6&lt;code class=&quot;highlighter-rouge&quot;&gt;体sockaddr_in6 struct&lt;/code&gt;代替IPv4的&lt;code class=&quot;highlighter-rouge&quot;&gt;SOCKADDR_IN struct&lt;/code&gt;。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;reachabilityForInternetConnection：这个监视地址0.0.0.0，可达性将其视作导致它实际监控设备的一般路由状态，IPv4和IPv6两种特殊令牌。&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h1 id=&quot;reachabilityforlocalwifi&quot;&gt;reachabilityForLocalWiFi去除&lt;/h1&gt;
+&lt;p&gt;这个样本的旧版本包含的方法reachabilityForLocalWiFi。按照最初的设计，这种方法使用Bonjour在检查“地方只有”无线网络连接的状态（的Wi-Fi无较大互联网的连接），以确定它们是否应该做广告或浏览允许应用程序。&lt;/p&gt;
+
+&lt;p&gt;但是，至今已加入iOS和OS X上附加对等网络API已渲染它在很大程度上已过时。由于狭窄的情况下，使用此API和滥用的巨大潜力的，reachabilityForLocalWiFi已从可达删除。&lt;/p&gt;
+
+&lt;p&gt;具有特定的要求可以使用reachabilityWithAddress应用来监视IN_LINKLOCALNETNUM（即，169.254.0.0）。&lt;/p&gt;
+
+&lt;p&gt;注意：有特定的要求，应监测IN_LINKLOCALNETNUM ONLY应用程序。对于绝大多数的应用程序，监督该地址是不必要的，潜在的危害性。&lt;/p&gt;
+
+&lt;h1 id=&quot;section&quot;&gt;使用示例&lt;/h1&gt;
+
+&lt;p&gt;构建和使用Xcode运行示例。当运行iPhone模拟器，你可以，或者通过加入一个特设的本地Wi-Fi网络行使断开以太网电缆，关闭机场的应用。&lt;/p&gt;
+
+&lt;p&gt;默认情况下，应用程序使用www.apple.com其远程主机。您可以通过修改-viewDidLoad中的remotehostname变量的值更改APLViewController.m它使用的主机。&lt;/p&gt;
+
+&lt;p&gt;重要提示：必须可达性使用DNS来解析主机名，然后才能确定该主机是否可达，而这可能需要一些时间对某些网络连接。正因为如此，该API将返回NotReachable直到名称解析已完成。这种延迟可能是对某些网络界面上显示。
+可达示例演示异步使用SCNetworkReachability的API。您可以同步使用的API，但不发出主线程同步检查由主机名。如果设备无法到达DNS服务器或者是一个缓慢的网络上，给SCNetworkReachabilityGetFlags功能同步调用可以阻止30秒尝试解析主机名。如果这种情况发生在主线程，应用看门狗会杀了闲置20秒后的应用程序。&lt;/p&gt;
+
+&lt;p&gt;SCNetworkReachability的API目前不提供以检测设备级的对等网络，包括Multipeer连接，的GameKit，游戏中心，或对等网络NSNetService支持的一种手段。
+方法四：使用大小合适的贮存容器
+使用地址存储容器，例如sockaddr_storage，是大到足以存储IPv6地址
+方法五：检查源代码对于IPv6 DNS64/ NAT64不兼容性
+检查并消除特定的IPv4的API，如：
+inet_addr（）
+INET_ATON（）
+inet_lnaof（）
+inet_makeaddr（）
+inet_netof（）
+inet_network（）
+INET_NTOA（）
+inet_ntoa_r（）
+bindresvport（）
+getipv4sourcefilter（）
+setipv4sourcefilter（）
+如果你的代码处理的IPv4类型，确保IPv6的形式被处理过。
+IPv4 	                                            IPv6
+AF_INET	                                     AF_INET6
+PF_INET                                          PF_INET6
+struct in_addr	                              struct in_addr6
+struct sockaddr_in	                       struct     sockaddr_in6
+kDNSServiceProtocol_IPv4	          kDNSServiceProtocol_IPv6
+方法六：使用系统的API合成IPv6地址
+如果您的应用程序需要连接到仅支持IPv4的服务器没有DNS主机名，使用getaddrinfo来解决IPv4地址文字。如果当前网络接口不支持IPv4，但支持IPv6，NAT64和DNS64，执行此任务将会导致合成IPv6地址。
+注意： IPv6 addresses was added to getaddrinfo in iOS 9.2 and OS X 10.11.2
+方法七：测试对于IPv6 DNS64/ NAT64定期的兼容性
+最简单的方法来测试你的应用的IPv6 DNS64/ NAT64兼容性是网络大多数蜂窝运营商的类型部署，是设立一个本地IPv6 DNS64/ NAT64网络与你的Mac。然后，您可以从您的用于测试目的的其他设备连接到该网络。
+重要提示：IPv6的DNS64/ NAT64网络设置选项在OS X10.11及更高版本可用。此外，基于Mac的IPv6 DNS64/ NAT64网络是与已经执行了RFC6106支持客户端设备兼容：对于DNS配置IPv6路由器广告选项。如果您的测试设备不是iOS或OS X设备，请确保它支持这一RFC。需要注意的是，不同于服务提供商部署DNS64/ NAT64工作流程，一台Mac，基于IPv6 DNS64/ NAT64总是产生合成的IPv6地址。因此，它不提供本地网络的外部访问仅IPv6服务器。
+注意事项：为了确保测试发生严把本地IPv6网络上，请确保您的测试设备没有其他活动的网络接口。例如，如果您正在使用iOS设备进行测试，确保蜂窝服务被禁用，所以你只能通过Wi-Fi测试。&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;是否直接使用了IP地址？&lt;/li&gt;
+  &lt;li&gt;是否允许用户以除了URL之外的某些形式直接输入地址？&lt;/li&gt;
+  &lt;li&gt;是否使用了不是基于NSURL的API？&lt;/li&gt;
+  &lt;li&gt;是否因某些原因直接进行了DNS查找？&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;从2016年6月1日开始，所有上传到app store的app必须支持 IPv6网络，大多数使用了NSURLSession和CFNetwork APIs的app可以不做任何变化。
+如果你的app使用了IPv4 APIS硬编码（硬编码是指将可变变量用一个固定值来代替的方法） ip地址，你需要做出的改动是：&lt;/p&gt;
+
+&lt;p&gt;Supporting IPv6 DNS64/NAT64 Networks
+使用了IPv4的企业等需要配置IPv6 DNS64 / NAT64—这两种技术是IPV4向IPv6转换的途径，根据每个app的不同，从ipv4转换到ipv4有一些不同：
+1 如果使用了高级别的网络API，比如NSURLSession and the CFNetwork等框架并且用名字链接，不需要做任何转换，如果你没有用名字连接，那你就需要避免网络连接错误的几种情况
+1&amp;gt; 避免TCP因超时而出现断开，使TCP存活是通过设置SO_KEEPALIVE标志用setsockopt插槽 —在电脑上可用，在软件上不可以用，因为要影响其他的app&lt;/p&gt;
+
+&lt;p&gt;正确地创建插槽。正确的调用创建TCP套接字是：&lt;/p&gt;
+
+&lt;p&gt;插座（PF_INET，SOCK_STREAM，IPPROTO_TCP）; //的IPv4
+插座（PF_INET6，SOCK_STREAM，IPPROTO_TCP）; // IPv6的&lt;/p&gt;
+
+&lt;p&gt;2 如果使用了低级的API或者框架，就要确保在ipv6和4状态下都可以正常运行&lt;/p&gt;
+
+&lt;p&gt;IPv6的比IPv4更高效
+除了求解IPv4的枯竭问题，IPv6是比IPv4更有效。例如，IPv6的：&lt;/p&gt;
+
+&lt;p&gt;避免了网络地址转换的需要（NAT）的
+提供更快的使用简化的报头通过网络路由
+防止网络碎片
+避免了广播邻居地址解析
+//
+支持移动4g，突破了原来的局限
+多媒体服务的兼容性
+IP多媒体核心网络子系统（IMS）允许的服务，例如多媒体短信和LTE语音（VoLTE的）通过IP交付。一些服务提供商使用的IMS是只兼容IPv6。
+//成本
+服务供应商继续支持原有IPv4网络，而行业的不断迁移到IPv6支付额外运营成本和管理成本。&lt;/p&gt;
+
+&lt;p&gt;利用DNS64/NAT64提供二者通道&lt;/p&gt;
+
+&lt;p&gt;在这种类型的工作流程中，客户端发送DNS查询到DNS64服务器，其从DNS服务器请求IPv6地址。当IPv6地址被发现，它的立即传递回客户端。然而，未找到地址时，所述DNS64服务器请求IPv4地址代替。所述DNS64服务器随后合成由前缀IPv4地址的IPv6地址，并传递回客户端。在这点上，客户端总是接收的IPv6就绪地址。
+Figure 10-3  DNS64 IPv4 to IPv6 translation process&lt;/p&gt;
+
+&lt;p&gt;当客户端发送到服务器的请求时，发往合成地址的任何IPv6数据包自动由网络通过一个NAT64网关路由。网关进行IPv6到IPv4地址和协议转换的请求。它也执行IPv4到IPv6转换来自服务器的响应。
+Figure 10-4  Workflow of a DNS64/NAT64 transitional solution&lt;/p&gt;
+
+&lt;p&gt;//////重点
+应用程序是不支持IPv6兼容的DNS64/ NAT64网络操作时可能会遇到的问题 及解决办法：
+1 IP地址文字嵌入协议。许多通信协议SIP、FTP的WebSockets，和对等网络协议（P2PP），包括在协议消息的IP地址文字。例如，FTP参数命令数据输入端口和包括IP地址文字被动交换信息。同样，IP地址的文字可能会出现在SIP头字段的值，如收件人，发件人，联系方式，记录路由，和Via。&lt;/p&gt;
+
+&lt;p&gt;2 嵌入在配置文件中的IP地址文字。配置文件通常包含IP地址的文字。&lt;/p&gt;
+
+&lt;p&gt;3 网络预检。许多应用程序试图主动检查Internet连接，或者通过IP地址常量来网络可达性的API活跃的Wi-Fi连接。&lt;/p&gt;
+
+&lt;p&gt;4 使用低级别的网络API。有些应用与插座等原始的网络API，如的gethostbyname，gethostbyname2和INET_ATON直接工作。这些API很容易误用或他们只支持IPv4，例如，主机名解析为AF_INET地址族，而不是AF_UNSPEC地址族。&lt;/p&gt;
+
+&lt;p&gt;5 用小地址族的储存容器。有些应用程序和网络库使用的地址存储容器，如uint32_t的，in_addr结构和SOCKADDR_IN - 这是32位或更小。&lt;/p&gt;
+
+&lt;p&gt;/////保证支持IPv6
+方法一：使用高级别的网络框架或者低级别的POSIX socket APIs
+例如：WebKit，Cocoa URL loading system，CFNetwork&lt;/p&gt;
+
+&lt;p&gt;方法二： 不要使用IP地址字面—IP Address Literals
+确保你不及格的IPv4地址文字的点符号的API，例如getaddrinfo和SCNetworkReachabilityCreateWithName。相反，使用高层次的网络架构和API的地址无关的版本，如getaddrinfo和getnameinfo，并通过他们的主机名或完全限定域名（FQDN）。
+——在iOS中9和OS X10.11及更高版本，NSURLSession和CFNetwork的自动合成的IPv6与IPv4文字当地上DNS64/ NAT64网络运营设备地址。不过，你还是应该努力摆脱你的IP地址文字的代码。
+方法三：连接而无需预检
+可达性的API，正在确定连接问题后，用于诊断目的。许多应用程序不正确地使用这些API主动检查通过调用SCNetworkReachabilityCreateWithAddress方法，并传递给它的0.0.0.0 IPv4地址，这表明还有就是网络上的路由器连接到互联网。然而，路由器的存在并不能保证一个因特网连接是否存在。一般情况下，避免预检网络可达性。刚刚尝试做一个连接，并从容地处理故障。如果你必须检查网络的可用性，避免调用SCNetworkReachabilityCreateWithAddress方法。调用SCNetworkReachabilityCreateWithName方法，并传递给它一个主机名代替。&lt;/p&gt;
+
+&lt;p&gt;！！！！重点！！！！有些应用程序还通过SCNetworkReachabilityCreateWithAddress方法169.254.0.0，自分配的链路本地地址的IPv4地址，以检查活跃的Wi-Fi连接。要检查Wi-Fi或蜂窝连接，查找网络可达性标志kSCNetworkReachabilityFlagsIsWWAN代替。&lt;/p&gt;
+
+&lt;p&gt;方法四：使用大小合适的贮存容器
+使用地址存储容器，例如sockaddr_storage，是大到足以存储IPv6地址&lt;/p&gt;
+
+&lt;p&gt;方法五：检查源代码对于IPv6 DNS64/ NAT64不兼容性
+检查并消除特定的IPv4的API，如：&lt;/p&gt;
+
+&lt;p&gt;inet_addr（）
+INET_ATON（）
+inet_lnaof（）
+inet_makeaddr（）
+inet_netof（）
+inet_network（）
+INET_NTOA（）
+inet_ntoa_r（）
+bindresvport（）
+getipv4sourcefilter（）
+setipv4sourcefilter（）
+如果你的代码处理的IPv4类型，确保IPv6的形式被处理过。&lt;/p&gt;
+
+&lt;p&gt;IPv4 	                                            IPv6
+AF_INET	                                     AF_INET6
+PF_INET                                          PF_INET6
+struct in_addr	                              struct in_addr6
+struct sockaddr_in	                       struct sockaddr_in6
+kDNSServiceProtocol_IPv4	          kDNSServiceProtocol_IPv6&lt;/p&gt;
+
+&lt;p&gt;方法六：使用系统的API合成IPv6地址&lt;/p&gt;
+
+&lt;p&gt;如果您的应用程序需要连接到仅支持IPv4的服务器没有DNS主机名，使用getaddrinfo来解决IPv4地址文字。如果当前网络接口不支持IPv4，但支持IPv6，NAT64和DNS64，执行此任务将会导致合成IPv6地址。&lt;/p&gt;
+
+&lt;p&gt;如下代码：  显示了如何解析IPv4使用的getaddrinfo文字。假定已存储在存储器中的IPv4地址为四个字节（例如{192，0，2，1}），本实施例中代码将其转换成字符串（如“192.0.2.1”），使用的getaddrinfo合成的IPv6地址（如含IPv6的一个结构解决sockaddr_in6的“64：ff9b::192.0.2.1”），并尝试连接到IPv6地址。&lt;/p&gt;
+
+&lt;p&gt;Using getaddrinfo to resolve an IPv4 address literal
+#include &amp;lt;sys/socket.h&amp;gt;&lt;/p&gt;
+
+&lt;h1 id=&quot;include-netdbh&quot;&gt;include &lt;netdb.h&gt;&lt;/netdb.h&gt;&lt;/h1&gt;
+
+&lt;h1 id=&quot;include-arpaineth&quot;&gt;include &amp;lt;arpa/inet.h&amp;gt;&lt;/h1&gt;
+
+&lt;h1 id=&quot;include-errh&quot;&gt;include &lt;err.h&gt;&lt;/err.h&gt;&lt;/h1&gt;
+
+&lt;p&gt;uint8_t ipv4[4] = {192, 0, 2, 1};&lt;/p&gt;
+
+&lt;p&gt;struct addrinfo hints, *res, *res0;&lt;/p&gt;
+
+&lt;p&gt;int error, s;&lt;/p&gt;
+
+&lt;p&gt;const char *cause = NULL;&lt;/p&gt;
+
+&lt;p&gt;char ipv4_str_buf[INET_ADDRSTRLEN] = { 0 };&lt;/p&gt;
+
+&lt;p&gt;const char *ipv4_str = inet_ntop(AF_INET, &amp;amp;ipv4, ipv4_str_buf, sizeof(ipv4_str_buf));&lt;/p&gt;
+
+&lt;p&gt;memset(&amp;amp;hints, 0, sizeof(hints));&lt;/p&gt;
+
+&lt;p&gt;hints.ai_family = PF_UNSPEC;&lt;/p&gt;
+
+&lt;p&gt;hints.ai_socktype = SOCK_STREAM;&lt;/p&gt;
+
+&lt;p&gt;hints.ai_flags = AI_DEFAULT;&lt;/p&gt;
+
+&lt;p&gt;error = getaddrinfo(ipv4_str, “http”, &amp;amp;hints, &amp;amp;res0);&lt;/p&gt;
+
+&lt;p&gt;if (error) {&lt;/p&gt;
+
+&lt;p&gt;errx(1, “%s”, gai_strerror(error));&lt;/p&gt;
+
+&lt;p&gt;/&lt;em&gt;NOTREACHED&lt;/em&gt;/&lt;/p&gt;
+
+&lt;p&gt;}&lt;/p&gt;
+
+&lt;p&gt;s = -1;&lt;/p&gt;
+
+&lt;p&gt;for (res = res0; res; res = res-&amp;gt;ai_next) {&lt;/p&gt;
+
+&lt;p&gt;s = socket(res-&amp;gt;ai_family, res-&amp;gt;ai_socktype,&lt;/p&gt;
+
+&lt;p&gt;res-&amp;gt;ai_protocol);&lt;/p&gt;
+
+&lt;p&gt;if (s &amp;lt; 0) {&lt;/p&gt;
+
+&lt;p&gt;cause = “socket”;&lt;/p&gt;
+
+&lt;p&gt;continue;&lt;/p&gt;
+
+&lt;p&gt;}&lt;/p&gt;
+
+&lt;p&gt;if (connect(s, res-&amp;gt;ai_addr, res-&amp;gt;ai_addrlen) &amp;lt; 0) {&lt;/p&gt;
+
+&lt;p&gt;cause = “connect”;&lt;/p&gt;
+
+&lt;p&gt;close(s);&lt;/p&gt;
+
+&lt;p&gt;s = -1;&lt;/p&gt;
+
+&lt;p&gt;continue;&lt;/p&gt;
+
+&lt;p&gt;}&lt;/p&gt;
+
+&lt;p&gt;break;  /* okay we got one */&lt;/p&gt;
+
+&lt;p&gt;}&lt;/p&gt;
+
+&lt;p&gt;if (s &amp;lt; 0) {&lt;/p&gt;
+
+&lt;p&gt;err(1, “%s”, cause);&lt;/p&gt;
+
+&lt;p&gt;/&lt;em&gt;NOTREACHED&lt;/em&gt;/&lt;/p&gt;
+
+&lt;p&gt;}&lt;/p&gt;
+
+&lt;p&gt;freeaddrinfo(res0);&lt;/p&gt;
+
+&lt;p&gt;注意：：： IPv6 addresses was added to getaddrinfo in iOS 9.2 and OS X 10.11.2&lt;/p&gt;
+
+&lt;p&gt;方法七：测试对于IPv6 DNS64/ NAT64定期的兼容性
+最简单的方法来测试你的应用的IPv6 DNS64/ NAT64兼容性是网络大多数蜂窝运营商的类型部署，是设立一个本地IPv6 DNS64/ NAT64网络与你的Mac。然后，您可以从您的用于测试目的的其他设备连接到该网络。见图10-6。&lt;/p&gt;
+
+&lt;p&gt;重要提示：IPv6的DNS64/ NAT64网络设置选项在OS X10.11及更高版本可用。此外，基于Mac的IPv6 DNS64/ NAT64网络是与已经执行了RFC6106支持客户端设备兼容：对于DNS配置IPv6路由器广告选项。如果您的测试设备不是iOS或OS X设备，请确保它支持这一RFC。需要注意的是，不同于服务提供商部署DNS64/ NAT64工作流程，一台Mac，基于IPv6 DNS64/ NAT64总是产生合成的IPv6地址。因此，它不提供本地网络的外部访问仅IPv6服务器。&lt;/p&gt;
+
+&lt;p&gt;测试具体步骤：
+Figure 10-6  A local Mac-based IPv6 DNS64/NAT64 network&lt;/p&gt;
+
+&lt;p&gt;To set up a local IPv6 Wi-Fi network using your Mac
+1.	Make sure your Mac is connected to the Internet, but not through Wi-Fi.
+2.	Launch System Preferences from your Dock, LaunchPad, or the Apple menu.
+3.	Press the Option key and click Sharing. Don’t release the Option key yet.Figure 10-7  Opening Sharing preferences&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;
+    &lt;p&gt;Select Internet Sharing in the list of sharing services.Figure 10-8  Configuring Internet sharing&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;Release the Option key.&lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Select the Create NAT64 Network checkbox.Figure 10-9  Enabling a local IPv6 NAT64 network&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Choose the network interface that provides your Internet connection, such as Thunderbolt Ethernet.Figure 10-10  Choosing a network interface to share&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Select the Wi-Fi checkbox.Figure 10-11  Enabling sharing over Wi-Fi&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Click Wi-Fi Options, and configure the network name and security options for your network.Figure 10-12  Accessing Wi-Fi network options&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Figure 10-13  Setting up local Wi-Fi network options&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Select the Internet Sharing checkbox to enable your local network.Figure 10-14  Enabling Internet sharing&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;When prompted to confirm you want to begin sharing, click Start.Figure 10-15  Starting Internet sharing&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Once sharing is active, you should see a green status light and a label that says Internet Sharing: On. In the Wi-Fi menu, you will also see a small, faint arrow pointing up, indicating that Internet Sharing is enabled. You now have an IPv6 NAT64 network and can connect to it from other devices in order to test your app.
+Figure 10-16  Internet sharing indicator&lt;/p&gt;
+
+&lt;p&gt;Important: To ensure that testing takes place strictly on the local IPv6 network, make sure your test devices don’t have other active network interfaces. For example, if you are testing with an iOS device, make sure cellular service is disabled so you are only testing over Wi-Fi.&lt;/p&gt;
+
+&lt;p&gt;注意事项：为了确保测试发生严把本地IPv6网络上，请确保您的测试设备没有其他活动的网络接口。例如，如果您正在使用iOS设备进行测试，确保蜂窝服务被禁用，所以你只能通过Wi-Fi测试。&lt;/p&gt;
+
+&lt;p&gt;IPv6地址格式及类型
+(2010-06-24 21:25:22)&lt;/p&gt;
+
+&lt;p&gt;转载▼
+标签：	杂谈	分类： IPv6 
+IPv6地址格式
+IPv6的地址长度是128位（bit）。
+将这128位的地址按每16位划分为一个段，将每个段转换成十六进制数字，并用冒号隔开。
+例如：2000:0000:0000:0000:0001:2345:6789:abcd
+这个地址很长，可以用两种方法对这个地址进行压缩，
+前导零压缩法：
+将每一段的前导零省略，但是每一段都至少应该有一个数字
+例如：2000:0:0:0:1:2345:6789:abcd
+双冒号法：
+如果一个以冒号十六进制数表示法表示的IPv6地址中，如果几个连续的段值都是0，那么这些0可以简记为::。每个地址中只能有一个::。
+例如：2000::1:2345:6789:abcd&lt;/p&gt;
+
+&lt;p&gt;单播地址（Unicast IPv6 Addresses）
+可聚合的全球单播地址（Aggregatable Global Unicast Addresses）
+可在全球范围内路由和到达的，相当于IPv4里面的global addresses。前三个bit是001
+例如：2000::1:2345:6789:abcd&lt;/p&gt;
+
+&lt;p&gt;链路本地地址（Link-Local Addresses）
+用于同一个链路上的相邻节点之间通信，相当于IPv4里面的169.254.0.0/16地址。Ipv6的路由器不会转发链路本地地址的数据包。前10个bit是1111 1110 10，由于最后是64bit的interface ID，所以它的前缀总是FE80::/64
+例如：FE80::1&lt;/p&gt;
+
+&lt;p&gt;站点本地地址（Site-Local Addresses）
+对于无法访问internet的本地网络，可以使用站点本地地址，这个相当于IPv4里面的private address（10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16）。它的前10个bit是1111 1110 11，它最后是16bit的Subnet ID和64bit的interface ID，所以它的前缀是FEC0::/48。
+值得注意的是，在RFC3879中，最终决定放弃单播站点本地地址。放弃的理由是，由于其固有的二义性带来的单播站点本地地址的复杂性超过了它们可能带来的好处。它在RFC4193中被ULA取代。&lt;/p&gt;
+
+&lt;p&gt;唯一的本地IPv6单播地址（ULA，Unique Local IPv6 Unicast Address）
+在RFC4193中标准化了一种用来在本地通信中取代单播站点本地地址的地址。ULA拥有固定前缀FD00::/8，后面跟一个被称为全局ID的40bit随机标识符。&lt;/p&gt;
+
+&lt;p&gt;未指定地址（Unspecified address）
+0:0:0:0:0:0:0:0 或者::
+当一个有效地址还不能确定，一般用未指定地址作为源地址。未指定地址不能作为一个目标地址来使用。&lt;/p&gt;
+
+&lt;p&gt;回环地址（Loopback address）
+回环地址::1用于标识一个回环接口，可以使一个节点可以给自己发送数据包。相当于IPv4的回环地址127.0.0.1&lt;/p&gt;
+
+&lt;p&gt;兼容IPv4的地址（IPv4-compatible address）
+形如::w.x,y.z，这里的w.x.y.z是IPv4公共地址的十进制点号表示法，用于IPv6/IPv4节点们（同时支持）在使用仅支持IPv4的网络上用IPv6的协议进行通信。
+但是事实证明这种技术不是个好主意，RFC4291中废弃了对这类地址的使用。&lt;/p&gt;
+
+&lt;p&gt;IPv4映射地址（IPv4-mapped address）
+形如::FFFF:w.x.y.z，这里的w.x.y.z是IPv4公共地址的十进制点号表示法,用于一个仅支持IPv4的节点表现为一个IPv6的节点&lt;/p&gt;
+
+&lt;p&gt;6over4地址
+[64bit-prefix]:0:0:WWXX:YYZZ,其中的WWXX:YYZZ是w.x.y.z IPv4公共地址的十进制点号表示法，用于一个使用6to4协议的隧道机制的节点。&lt;/p&gt;
+
+&lt;p&gt;6to4地址
+2002:WWXX:YYZZ:[SLA ID]:[Interface ID],用于表示一个使用6to4协议的隧道机制节点。&lt;/p&gt;
+
+&lt;p&gt;多播IPv6地址（Multicast IPv6 Addresses）
+前8个bit为1111 1111，&lt;/p&gt;
+
+&lt;p&gt;其中FF01::到FF0F::的多播地址是保留专用地址
+FF01::1 节点本地范围所有节点多播地址
+FF02::1 链路本地范围所有节点多播地址
+FF01::2 节点本地范围所有路由器多播地址
+FF02::2 链路本地范围所有路由器多播地址
+FF05::2 站点本地范围所有路由器多播地址
+分享： 
+18&lt;/p&gt;
+
+&lt;p&gt;喜欢
+0&lt;/p&gt;
+
+&lt;p&gt;赠金笔&lt;/p&gt;
+
+&lt;p&gt;阅读(34507)┊ 评论 (2)┊ 收藏(1) ┊转载(13) ┊ 喜欢▼ ┊打印┊举报&lt;/p&gt;
+
+&lt;p&gt;前一篇：新的开始
+后一篇：kame是只乌龟&lt;/p&gt;
+
+&lt;p&gt;评论 
+[发评论]
+5.	评论加载中，请稍候…&lt;/p&gt;
+
+&lt;p&gt;发评论&lt;/p&gt;
+
+&lt;p&gt;登录名： 密码： 找回密码 注册 记住登录状态&lt;/p&gt;
+
+&lt;p&gt;分享到微博&lt;/p&gt;
+
+&lt;p&gt;评论并转载此博文&lt;/p&gt;
+
+&lt;p&gt;按住左边滑块，拖动完成上方拼图&lt;/p&gt;
+
+&lt;p&gt;发评论
+以上网友发言只代表其个人观点，不代表新浪网的观点或立场。&lt;/p&gt;
+
+&lt;p&gt;&amp;lt; 前一篇新的开始
+后一篇 &amp;gt;kame是只乌龟&lt;/p&gt;
+
+&lt;p&gt;新浪BLOG意见反馈留言板　不良信息反馈　电话：4006900000 提示音后按1键（按当地市话标准计费）　欢迎批评指正
+新浪简介 | About Sina | 广告服务 | 联系我们 | 招聘信息 | 网站律师 | SINA English | 会员注册 | 产品答疑 
+Copyright © 1996 - 2016 SINA Corporation, All Rights Reserved
+新浪公司 版权所有&lt;/p&gt;
+
+</description>
+        <pubDate>Fri, 14 Oct 2016 00:00:00 +0800</pubDate>
+        <link>/2016/10/IPV6/</link>
+        <guid isPermaLink="true">/2016/10/IPV6/</guid>
+        
+        <category>调研</category>
+        
+        
+      </item>
+    
+  </channel>
+</rss>
